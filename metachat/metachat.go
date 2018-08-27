@@ -73,15 +73,45 @@ func (m *Metachat) Start() error {
 	for {
 		select {
 		case msg := <-out:
-			err := m.messengers["Skype"].Send(msg, msg.Chat)
-			if err != nil {
-				return err
+			chats := m.getTargetChats(msg)
+			for _, chat := range chats {
+				err := m.messengers[chat.Messenger].Send(msg, chat.ID)
+				if err != nil {
+					return err
+				}
 			}
 
 		case err := <-errChan:
 			return err
 		}
 	}
+}
+
+func (m *Metachat) getTargetChats(msg Message) []Chat {
+	result := make([]Chat, 0)
+	for _, room := range m.rooms {
+		if !isMessageFromRoom(msg, room) {
+			continue
+		}
+
+		for _, chat := range room.Chats {
+			if chat.Messenger != msg.Messenger || chat.ID != msg.Chat {
+				result = append(result, chat)
+			}
+		}
+	}
+
+	return result
+}
+
+func isMessageFromRoom(msg Message, room Room) bool {
+	for _, chat := range room.Chats {
+		if msg.Chat == chat.ID {
+			return true
+		}
+	}
+
+	return false
 }
 
 func merge(chans []<-chan Message) <-chan Message {
