@@ -38,7 +38,7 @@ type (
 		HTTPClient  httpClient `json:"-"`
 	}
 
-	// Client is a Skype HTTP client.
+	// Client is a Skype client.
 	Client struct {
 		httpClient                  httpClient
 		username                    string

@@ -22,7 +22,7 @@ type (
 		VerificationToken string `json:"verificationToken"`
 	}
 
-	// Client is a Slack HTTP client.
+	// Client is a Slack client.
 	Client struct {
 		verificationToken string
 		api               *slack.Client
