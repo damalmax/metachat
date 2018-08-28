@@ -1,10 +1,20 @@
 package metachat
 
+import (
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
+	"github.com/pkg/errors"
+)
+
 type (
 	// Messenger is a common interface that must be implemented by all messenger clients.
 	Messenger interface {
-		Type() string
-		Start() error
+		Name() string
+		Start() (http.Handler, error)
 		MessageChan() <-chan Message
 		Send(Message, string) error
 	}
@@ -31,27 +41,34 @@ type (
 
 	// Config structure.
 	Config struct {
-		Rooms []Room `json:"rooms"`
+		Port       int         `json:"port"`
+		Rooms      []Room      `json:"rooms"`
+		Messengers []Messenger `json:"-"`
 	}
 
 	// Metachat structure.
 	Metachat struct {
+		port       int
 		messengers map[string]Messenger
 		rooms      []Room
 	}
 )
 
-// New is a metachat constructor.
-func New(rooms []Room, messengers ...Messenger) *Metachat {
-	mapping := make(map[string]Messenger)
-	for _, messenger := range messengers {
-		mapping[messenger.Type()] = messenger
+// New is a Metachat constructor.
+func New(config Config) (*Metachat, error) {
+	if config.Port == 0 {
+		return nil, errors.New("port can't be nil")
 	}
 
-	return &Metachat{messengers: mapping, rooms: rooms}
+	mapping := make(map[string]Messenger)
+	for _, messenger := range config.Messengers {
+		mapping[messenger.Name()] = messenger
+	}
+
+	return &Metachat{messengers: mapping, rooms: config.Rooms}, nil
 }
 
-// Start starts the metachat main loop.
+// Start starts the Metachat main loop.
 func (m *Metachat) Start() error {
 	chans := make([]<-chan Message, 100)
 	for _, v := range m.messengers {
@@ -61,14 +78,7 @@ func (m *Metachat) Start() error {
 	out := merge(chans)
 	errChan := make(chan error)
 
-	for _, v := range m.messengers {
-		go func(m Messenger, errChan chan error) {
-			err := m.Start()
-			if err != nil {
-				errChan <- err
-			}
-		}(v, errChan)
-	}
+	m.startMessengers(errChan)
 
 	for {
 		select {
@@ -85,6 +95,28 @@ func (m *Metachat) Start() error {
 			return err
 		}
 	}
+}
+
+func (m *Metachat) startMessengers(errChan chan error) {
+	r := chi.NewRouter()
+	r.Use(middleware.Recoverer)
+	for _, v := range m.messengers {
+		go func(m Messenger, errChan chan error) {
+			handler, err := m.Start()
+			if err != nil {
+				errChan <- err
+			}
+
+			if handler != nil {
+				path := strings.ToLower(strings.Replace(m.Name(), " ", "-", -1))
+				r.Mount(path, handler)
+			}
+		}(v, errChan)
+	}
+
+	go func(errChan chan error) {
+		errChan <- http.ListenAndServe(":"+strconv.Itoa(m.port), r)
+	}(errChan)
 }
 
 func (m *Metachat) getTargetChats(msg Message) []Chat {

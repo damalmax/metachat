@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"sync"
 
 	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 	"github.com/nlopes/slack"
 	"github.com/nlopes/slack/slackevents"
@@ -20,14 +18,12 @@ import (
 type (
 	// Config structure.
 	Config struct {
-		Port              int    `json:"port"`
 		Token             string `json:"token"`
 		VerificationToken string `json:"verificationToken"`
 	}
 
 	// Client is a Slack HTTP client.
 	Client struct {
-		port              int
 		verificationToken string
 		api               *slack.Client
 		usersByID         userMap
@@ -42,8 +38,8 @@ type (
 
 // NewClient is a Slack client constructor.
 func NewClient(config Config) (*Client, error) {
-	if config.Token == "" || config.VerificationToken == "" || config.Port == 0 {
-		return nil, errors.New("token, verification token and port can't be nil")
+	if config.Token == "" || config.VerificationToken == "" {
+		return nil, errors.New("token and verification token can't be nil")
 	}
 
 	api := slack.New(config.Token)
@@ -53,14 +49,11 @@ func NewClient(config Config) (*Client, error) {
 	}
 
 	usersByID := userMap{users: make(map[string]string)}
-	usersByID.Lock()
 	for _, user := range users {
 		usersByID.users[user.ID] = user.RealName
 	}
-	usersByID.Unlock()
 
 	return &Client{
-		port:              config.Port,
 		verificationToken: config.VerificationToken,
 		api:               api,
 		usersByID:         usersByID,
@@ -68,8 +61,8 @@ func NewClient(config Config) (*Client, error) {
 	}, nil
 }
 
-// Type returns the messenger type.
-func (c *Client) Type() string {
+// Name returns the messenger name.
+func (c *Client) Name() string {
 	return "Slack"
 }
 
@@ -79,13 +72,11 @@ func (c *Client) MessageChan() <-chan metachat.Message {
 }
 
 // Start starts the client main loop.
-func (c *Client) Start() error {
+func (c *Client) Start() (http.Handler, error) {
 	r := chi.NewRouter()
-	r.Use(middleware.Recoverer)
-
 	r.Post("/", c.handleEvents)
 
-	return http.ListenAndServe(":"+strconv.Itoa(c.port), r)
+	return r, nil
 }
 
 // Send sends a message to chat with the provided ID.

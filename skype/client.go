@@ -101,8 +101,8 @@ func NewClient(config Config) (*Client, error) {
 	return client, nil
 }
 
-// Type returns the messenger type.
-func (c *Client) Type() string {
+// Name returns the messenger name.
+func (c *Client) Name() string {
 	return "Skype"
 }
 
@@ -112,23 +112,23 @@ func (c *Client) MessageChan() <-chan metachat.Message {
 }
 
 // Start starts the client main loop.
-func (c *Client) Start() error {
+func (c *Client) Start() (http.Handler, error) {
 	if time.Now().After(c.registrationTokenExpiration) {
 		err := c.getTokens()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		err = c.subscribe()
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	for {
 		resources, err := c.getMessages()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		for _, r := range resources {
