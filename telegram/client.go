@@ -45,11 +45,16 @@ func (c *Client) Name() string {
 }
 
 // Start starts the client main loop.
-func (c *Client) Start() (http.Handler, error) {
+func (c *Client) Start() error {
+	return nil
+}
+
+// Webhook returns HTTP handler for webhook requests.
+func (c *Client) Webhook() http.Handler {
 	r := chi.NewRouter()
 	r.Post("/", c.handleEvents)
 
-	return r, nil
+	return r
 }
 
 // MessageChan returns a read-only message channel.
@@ -64,7 +69,12 @@ func (c *Client) Send(message metachat.Message, chat string) error {
 		return errors.WithStack(err)
 	}
 
-	msg := tgbotapi.NewMessage(id, fmt.Sprintf("*[%s]* %s", message.Author, message.Text))
+	content := message.Text
+	if message.Author != "" {
+		content = fmt.Sprintf("*[%s]* %s", message.Author, message.Text)
+	}
+
+	msg := tgbotapi.NewMessage(id, content)
 	msg.ParseMode = tgbotapi.ModeMarkdown
 
 	_, err = c.api.Send(msg)
@@ -83,7 +93,7 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if event.Message == nil {
+	if event.Message == nil || event.Message.Text == "" {
 		return
 	}
 

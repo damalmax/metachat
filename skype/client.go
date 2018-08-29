@@ -112,29 +112,34 @@ func (c *Client) MessageChan() <-chan metachat.Message {
 }
 
 // Start starts the client main loop.
-func (c *Client) Start() (http.Handler, error) {
+func (c *Client) Start() error {
 	if time.Now().After(c.registrationTokenExpiration) {
 		err := c.getTokens()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		err = c.subscribe()
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	for {
 		resources, err := c.getMessages()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		for _, r := range resources {
 			c.messageChan <- convert(r)
 		}
 	}
+}
+
+// Webhook returns HTTP handler for webhook requests.
+func (c *Client) Webhook() http.Handler {
+	return nil
 }
 
 // Send sends a message to chat with the provided ID.
@@ -146,10 +151,15 @@ func (c *Client) Send(message metachat.Message, chat string) error {
 		}
 	}
 
+	content := message.Text
+	if message.Author != "" {
+		content = fmt.Sprintf(`<b raw_pre="*" raw_post="*">[%s]</b> %s`, message.Author, message.Text)
+	}
+
 	data := text{
 		ContentType: "text",
 		MessageType: "Text",
-		Content:     fmt.Sprintf(`<b raw_pre="*" raw_post="*">[%s]</b> %s`, message.Author, message.Text),
+		Content:     content,
 	}
 
 	payload, err := json.Marshal(data)

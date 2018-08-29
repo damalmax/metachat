@@ -10,11 +10,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+const chatIDCommand = "metachat chatID"
+
 type (
 	// Messenger is a common interface that must be implemented by all messenger clients.
 	Messenger interface {
 		Name() string
-		Start() (http.Handler, error)
+		Webhook() http.Handler
+		Start() error
 		MessageChan() <-chan Message
 		Send(Message, string) error
 	}
@@ -65,7 +68,11 @@ func New(config Config) (*Metachat, error) {
 		mapping[messenger.Name()] = messenger
 	}
 
-	return &Metachat{messengers: mapping, rooms: config.Rooms}, nil
+	return &Metachat{
+		port:       config.Port,
+		messengers: mapping,
+		rooms:      config.Rooms,
+	}, nil
 }
 
 // Start starts the Metachat main loop.
@@ -83,11 +90,18 @@ func (m *Metachat) Start() error {
 	for {
 		select {
 		case msg := <-out:
-			chats := m.getTargetChats(msg)
-			for _, chat := range chats {
-				err := m.messengers[chat.Messenger].Send(msg, chat.ID)
+			if msg.isCommand() {
+				err := m.handleCommand(msg)
 				if err != nil {
 					return err
+				}
+			} else {
+				chats := m.getTargetChats(msg)
+				for _, chat := range chats {
+					err := m.messengers[chat.Messenger].Send(msg, chat.ID)
+					if err != nil {
+						return err
+					}
 				}
 			}
 
@@ -100,23 +114,36 @@ func (m *Metachat) Start() error {
 func (m *Metachat) startMessengers(errChan chan error) {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
-	for _, v := range m.messengers {
-		go func(m Messenger, errChan chan error) {
-			handler, err := m.Start()
-			if err != nil {
-				errChan <- err
-			}
-
-			if handler != nil {
-				path := strings.ToLower(strings.Replace(m.Name(), " ", "-", -1))
-				r.Mount(path, handler)
-			}
-		}(v, errChan)
+	r.Use(middleware.Heartbeat("/health"))
+	for _, msgr := range m.messengers {
+		handler := msgr.Webhook()
+		if handler != nil {
+			path := "/" + strings.ToLower(strings.Replace(msgr.Name(), " ", "-", -1))
+			r.Mount(path, handler)
+		} else {
+			go func(msgr Messenger, errChan chan error) {
+				err := msgr.Start()
+				if err != nil {
+					errChan <- err
+				}
+			}(msgr, errChan)
+		}
 	}
 
 	go func(errChan chan error) {
 		errChan <- http.ListenAndServe(":"+strconv.Itoa(m.port), r)
 	}(errChan)
+}
+
+func (m *Metachat) handleCommand(msg Message) error {
+	if msg.Text == chatIDCommand {
+		err := m.messengers[msg.Messenger].Send(Message{Text: msg.Chat}, msg.Chat)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m *Metachat) getTargetChats(msg Message) []Chat {
@@ -134,6 +161,10 @@ func (m *Metachat) getTargetChats(msg Message) []Chat {
 	}
 
 	return result
+}
+
+func (m Message) isCommand() bool {
+	return m.Text == chatIDCommand
 }
 
 func isMessageFromRoom(msg Message, room Room) bool {

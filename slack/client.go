@@ -72,18 +72,26 @@ func (c *Client) MessageChan() <-chan metachat.Message {
 }
 
 // Start starts the client main loop.
-func (c *Client) Start() (http.Handler, error) {
+func (c *Client) Start() error {
+	return nil
+}
+
+// Webhook returns HTTP handler for webhook requests.
+func (c *Client) Webhook() http.Handler {
 	r := chi.NewRouter()
 	r.Post("/", c.handleEvents)
 
-	return r, nil
+	return r
 }
 
 // Send sends a message to chat with the provided ID.
 func (c *Client) Send(message metachat.Message, chat string) error {
-	_, _, err := c.api.PostMessage(chat, fmt.Sprintf("*[%s]* %s", message.Author, message.Text),
-		slack.PostMessageParameters{UnfurlLinks: true, Markdown: true})
+	content := message.Text
+	if message.Author != "" {
+		content = fmt.Sprintf("*[%s]* %s", message.Author, message.Text)
+	}
 
+	_, _, err := c.api.PostMessage(chat, content, slack.PostMessageParameters{UnfurlLinks: true, Markdown: true})
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -108,7 +116,7 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	if event.Type == slackevents.URLVerification {
 		var resp *slackevents.ChallengeResponse
-		err := json.Unmarshal([]byte(body), &r)
+		err := json.Unmarshal([]byte(body), &resp)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -126,8 +134,12 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			if message.Text == "" {
+				return
+			}
+
 			c.messageChan <- message
-			return
+			render.PlainText(w, r, "OK")
 		}
 	}
 }
