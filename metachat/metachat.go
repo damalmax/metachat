@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/render"
 	"github.com/pkg/errors"
 )
 
@@ -53,7 +54,7 @@ type (
 	Metachat struct {
 		port       int
 		messengers map[string]Messenger
-		rooms      []Room
+		rooms      map[string]Room
 	}
 )
 
@@ -63,21 +64,32 @@ func New(config Config) (*Metachat, error) {
 		return nil, errors.New("port can't be nil")
 	}
 
-	mapping := make(map[string]Messenger)
+	messengers := make(map[string]Messenger)
 	for _, messenger := range config.Messengers {
-		mapping[messenger.Name()] = messenger
+		messengers[niceName(messenger.Name())] = messenger
 	}
 
-	return &Metachat{
+	rooms := make(map[string]Room)
+	for _, room := range config.Rooms {
+		rooms[niceName(room.Name)] = room
+	}
+
+	metachat := &Metachat{
 		port:       config.Port,
-		messengers: mapping,
-		rooms:      config.Rooms,
-	}, nil
+		messengers: messengers,
+		rooms:      rooms,
+	}
+
+	if err := metachat.validate(); err != nil {
+		return nil, err
+	}
+
+	return metachat, nil
 }
 
 // Start starts the Metachat main loop.
 func (m *Metachat) Start() error {
-	chans := make([]<-chan Message, 100)
+	chans := make([]<-chan Message, 0)
 	for _, v := range m.messengers {
 		chans = append(chans, v.MessageChan())
 	}
@@ -90,7 +102,7 @@ func (m *Metachat) Start() error {
 	for {
 		select {
 		case msg := <-out:
-			if msg.isCommand() {
+			if isCommand(msg) {
 				err := m.handleCommand(msg)
 				if err != nil {
 					return err
@@ -98,7 +110,7 @@ func (m *Metachat) Start() error {
 			} else {
 				chats := m.getTargetChats(msg)
 				for _, chat := range chats {
-					err := m.messengers[chat.Messenger].Send(msg, chat.ID)
+					err := m.messengers[niceName(chat.Messenger)].Send(msg, chat.ID)
 					if err != nil {
 						return err
 					}
@@ -111,22 +123,29 @@ func (m *Metachat) Start() error {
 	}
 }
 
-func (m *Metachat) startMessengers(errChan chan error) {
+func (m *Metachat) validate() error {
+	for _, room := range m.rooms {
+		for _, chat := range room.Chats {
+			if _, ok := m.messengers[niceName(chat.Messenger)]; !ok {
+				return errors.Errorf("messenger '%s' from room '%s' not found", chat.Messenger, room.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (m *Metachat) registerHandlers(errChan chan error) {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Heartbeat("/health"))
+	r.Post("/rooms/{room}", m.postMessageHandler)
+
 	for _, msgr := range m.messengers {
 		handler := msgr.Webhook()
 		if handler != nil {
-			path := "/" + strings.ToLower(strings.Replace(msgr.Name(), " ", "-", -1))
+			path := "/" + niceName(msgr.Name())
 			r.Mount(path, handler)
-		} else {
-			go func(msgr Messenger, errChan chan error) {
-				err := msgr.Start()
-				if err != nil {
-					errChan <- err
-				}
-			}(msgr, errChan)
 		}
 	}
 
@@ -135,9 +154,20 @@ func (m *Metachat) startMessengers(errChan chan error) {
 	}(errChan)
 }
 
+func (m *Metachat) startMessengers(errChan chan error) {
+	for _, msgr := range m.messengers {
+		go func(msgr Messenger, errChan chan error) {
+			err := msgr.Start()
+			if err != nil {
+				errChan <- err
+			}
+		}(msgr, errChan)
+	}
+}
+
 func (m *Metachat) handleCommand(msg Message) error {
 	if msg.Text == chatIDCommand {
-		err := m.messengers[msg.Messenger].Send(Message{Text: msg.Chat}, msg.Chat)
+		err := m.messengers[niceName(msg.Messenger)].Send(Message{Text: msg.Chat}, msg.Chat)
 		if err != nil {
 			return err
 		}
@@ -163,8 +193,35 @@ func (m *Metachat) getTargetChats(msg Message) []Chat {
 	return result
 }
 
-func (m Message) isCommand() bool {
-	return m.Text == chatIDCommand
+func (m *Metachat) postMessageHandler(w http.ResponseWriter, r *http.Request) {
+	roomName := chi.URLParam(r, "room")
+	room, ok := m.rooms[roomName]
+	if !ok {
+		http.Error(w, "Room not found", http.StatusNotFound)
+		return
+	}
+
+	message := Message{}
+	if err := render.Decode(r, &message); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	message.Author = ""
+
+	for _, chat := range room.Chats {
+		err := m.messengers[niceName(chat.Messenger)].Send(message, chat.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	render.Status(r, http.StatusOK)
+}
+
+func isCommand(message Message) bool {
+	return message.Text == chatIDCommand
 }
 
 func isMessageFromRoom(msg Message, room Room) bool {
@@ -189,4 +246,8 @@ func merge(chans []<-chan Message) <-chan Message {
 	}
 
 	return out
+}
+
+func niceName(name string) string {
+	return strings.ToLower(strings.Replace(name, " ", "-", -1))
 }
