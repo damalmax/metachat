@@ -97,6 +97,7 @@ func (m *Metachat) Start() error {
 	out := merge(chans)
 	errChan := make(chan error)
 
+	m.registerHandlers(errChan)
 	m.startMessengers(errChan)
 
 	for {
