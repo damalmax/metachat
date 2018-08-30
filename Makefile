@@ -11,4 +11,4 @@ install: format test
 	go install
 
 docker:
-	docker build -t metachat .
+	docker build -t thehadalone/metachat .
