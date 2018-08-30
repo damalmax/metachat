@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/go-chi/render"
+
 	"github.com/go-chi/chi"
 	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/pkg/errors"
@@ -89,7 +91,8 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 	var event tgbotapi.Update
 	err := json.NewDecoder(r.Body).Decode(&event)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		render.Status(r, http.StatusInternalServerError)
+		render.JSON(w, r, render.M{"error": err.Error()})
 		return
 	}
 
@@ -98,6 +101,7 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c.messageChan <- convert(event.Message)
+	render.JSON(w, r, render.M{})
 }
 
 func convert(msg *tgbotapi.Message) metachat.Message {

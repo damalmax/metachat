@@ -102,7 +102,8 @@ func (c *Client) Send(message metachat.Message, chat string) error {
 func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		render.Status(r, http.StatusInternalServerError)
+		render.JSON(w, r, render.M{"error": err.Error()})
 		return
 	}
 
@@ -110,7 +111,8 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 		slackevents.OptionVerifyToken(&slackevents.TokenComparator{VerificationToken: c.verificationToken}))
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		render.Status(r, http.StatusInternalServerError)
+		render.JSON(w, r, render.M{"error": err.Error()})
 		return
 	}
 
@@ -118,7 +120,8 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 		var resp *slackevents.ChallengeResponse
 		err := json.Unmarshal([]byte(body), &resp)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			render.Status(r, http.StatusInternalServerError)
+			render.JSON(w, r, render.M{"error": err.Error()})
 			return
 		}
 
@@ -139,9 +142,10 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 			}
 
 			c.messageChan <- message
-			render.PlainText(w, r, "OK")
 		}
 	}
+
+	render.JSON(w, r, render.M{})
 }
 
 func (c *Client) convert(event *slackevents.MessageEvent) (metachat.Message, error) {

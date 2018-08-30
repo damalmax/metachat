@@ -197,13 +197,15 @@ func (m *Metachat) postMessageHandler(w http.ResponseWriter, r *http.Request) {
 	roomName := chi.URLParam(r, "room")
 	room, ok := m.rooms[roomName]
 	if !ok {
-		http.Error(w, "Room not found", http.StatusNotFound)
+		render.Status(r, http.StatusNotFound)
+		render.JSON(w, r, render.M{})
 		return
 	}
 
 	message := Message{}
 	if err := render.Decode(r, &message); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, render.M{"error": err.Error()})
 		return
 	}
 
@@ -212,12 +214,13 @@ func (m *Metachat) postMessageHandler(w http.ResponseWriter, r *http.Request) {
 	for _, chat := range room.Chats {
 		err := m.messengers[niceName(chat.Messenger)].Send(message, chat.ID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			render.Status(r, http.StatusInternalServerError)
+			render.JSON(w, r, render.M{"error": err.Error()})
 			return
 		}
 	}
 
-	render.Status(r, http.StatusOK)
+	render.JSON(w, r, render.M{})
 }
 
 func isCommand(message Message) bool {
