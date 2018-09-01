@@ -158,7 +158,7 @@ func (c *Client) Send(message metachat.Message, chat string) error {
 
 	data := text{
 		ContentType: "text",
-		MessageType: "Text",
+		MessageType: "RichText",
 		Content:     content,
 	}
 
@@ -511,7 +511,7 @@ func (c *Client) getMessages() ([]resource, error) {
 }
 
 func (c *Client) isSupported(resource resource) bool {
-	return resource.Content != "" &&
+	return resource.Content != "" && !strings.Contains(resource.Content, "URIObject") &&
 		(resource.Messagetype == "Text" || resource.Messagetype == "RichText") &&
 		resource.Imdisplayname != c.displayName
 }
