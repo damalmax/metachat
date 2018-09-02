@@ -71,7 +71,7 @@ type (
 		Content          string `json:"content,omitempty"`
 	}
 
-	text struct {
+	message struct {
 		ContentType string `json:"contenttype"`
 		MessageType string `json:"messagetype"`
 		Content     string `json:"content"`
@@ -132,7 +132,7 @@ func (c *Client) Start() error {
 		}
 
 		for _, r := range resources {
-			c.messageChan <- convert(r)
+			c.messageChan <- convertToMetachat(r)
 		}
 	}
 }
@@ -143,7 +143,7 @@ func (c *Client) Webhook() http.Handler {
 }
 
 // Send sends a message to chat with the provided ID.
-func (c *Client) Send(message metachat.Message, chat string) error {
+func (c *Client) Send(msg metachat.Message, chat string) error {
 	if time.Now().After(c.registrationTokenExpiration) {
 		err := c.getTokens()
 		if err != nil {
@@ -151,18 +151,7 @@ func (c *Client) Send(message metachat.Message, chat string) error {
 		}
 	}
 
-	content := message.Text
-	if message.Author != "" {
-		content = fmt.Sprintf(`<b raw_pre="*" raw_post="*">[%s]</b> %s`, message.Author, message.Text)
-	}
-
-	data := text{
-		ContentType: "text",
-		MessageType: "RichText",
-		Content:     content,
-	}
-
-	payload, err := json.Marshal(data)
+	payload, err := json.Marshal(convertToSkype(msg))
 	if err != nil {
 		return errors.WithStack(err)
 	}

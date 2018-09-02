@@ -2,7 +2,6 @@ package slack
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sync"
@@ -85,12 +84,8 @@ func (c *Client) Webhook() http.Handler {
 }
 
 // Send sends a message to chat with the provided ID.
-func (c *Client) Send(message metachat.Message, chat string) error {
-	content := message.Text
-	if message.Author != "" {
-		content = fmt.Sprintf("*[%s]* %s", message.Author, message.Text)
-	}
-
+func (c *Client) Send(msg metachat.Message, chat string) error {
+	content := convertToSlack(msg)
 	_, _, err := c.api.PostMessage(chat, content, slack.PostMessageParameters{UnfurlLinks: true, Markdown: true})
 	if err != nil {
 		return errors.WithStack(err)
@@ -135,7 +130,7 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			message, err := c.convert(messageEvent)
+			message, err := c.convertToMetachat(messageEvent)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -145,29 +140,7 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// TODO handle user join
+
 	render.JSON(w, r, render.M{})
-}
-
-func (c *Client) convert(event *slackevents.MessageEvent) (metachat.Message, error) {
-	c.usersByID.RLock()
-	author, ok := c.usersByID.users[event.User]
-	c.usersByID.RUnlock()
-	if !ok {
-		user, err := c.api.GetUserInfo(event.User)
-		if err != nil {
-			return metachat.Message{}, errors.WithStack(err)
-		}
-
-		author = user.RealName
-		c.usersByID.Lock()
-		c.usersByID.users[user.ID] = user.RealName
-		c.usersByID.Unlock()
-	}
-
-	return metachat.Message{
-		Messenger: "Slack",
-		Chat:      event.Channel,
-		Author:    author,
-		Text:      event.Text,
-	}, nil
 }

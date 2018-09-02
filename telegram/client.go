@@ -2,13 +2,11 @@ package telegram
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/render"
-
 	"github.com/go-chi/chi"
+	"github.com/go-chi/render"
 	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/pkg/errors"
 	"github.com/thehadalone/metachat/metachat"
@@ -71,13 +69,8 @@ func (c *Client) Send(message metachat.Message, chat string) error {
 		return errors.WithStack(err)
 	}
 
-	content := message.Text
-	if message.Author != "" {
-		content = fmt.Sprintf("*[%s]* %s", message.Author, message.Text)
-	}
-
-	msg := tgbotapi.NewMessage(id, content)
-	msg.ParseMode = tgbotapi.ModeMarkdown
+	msg := convertToTelegram(message)
+	msg.BaseChat.ChatID = id
 
 	_, err = c.api.Send(msg)
 	if err != nil {
@@ -96,19 +89,15 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if event.Message == nil || event.Message.Text == "" {
+	msg := event.Message
+	if msg == nil {
+		msg = event.EditedMessage
+	}
+
+	if msg == nil || msg.Text == "" {
 		return
 	}
 
-	c.messageChan <- convert(event.Message)
+	c.messageChan <- convertToMetachat(msg)
 	render.JSON(w, r, render.M{})
-}
-
-func convert(msg *tgbotapi.Message) metachat.Message {
-	return metachat.Message{
-		Messenger: "Telegram",
-		Chat:      strconv.FormatInt(msg.Chat.ID, 10),
-		Author:    fmt.Sprintf("%s %s", msg.From.FirstName, msg.From.LastName),
-		Text:      msg.Text,
-	}
 }
