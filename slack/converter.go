@@ -40,7 +40,14 @@ func (c *Client) convertToMetachat(event *slackevents.MessageEvent) (metachat.Me
 	content = italicRegexp.ReplaceAllString(content, metachat.Italic("${1}"))
 	content = strikethroughRegexp.ReplaceAllString(content, metachat.Strikethrough("${1}"))
 	content = preformattedRegexp.ReplaceAllString(content, metachat.Preformatted("${1}"))
-	// TODO mention, quote
+	content = mentionRegexp.ReplaceAllStringFunc(content, func(match string) string {
+		id := mentionRegexp.FindStringSubmatch(match)[1]
+		c.usersByID.RLock()
+		name := c.usersByID.users[id]
+		c.usersByID.RUnlock()
+
+		return "@" + name
+	})
 
 	return metachat.Message{
 		Messenger: "Slack",

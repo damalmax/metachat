@@ -29,6 +29,7 @@ type (
 		messageChan       chan metachat.Message
 	}
 
+	// TODO add read/write methods with lock encapsulation
 	userMap struct {
 		sync.RWMutex
 		users map[string]string
