@@ -19,6 +19,7 @@ var (
 	linkRegexp          = regexp.MustCompile(`<a\b.*?href="(.*?)">.*?</a>`)
 	mentionRegexp       = regexp.MustCompile(`<at\b.*?id=".*?">(.*?)</at>`)
 	quoteRegexp         = regexp.MustCompile(`(?s)<quote\b.*?authorname="(.*?)" timestamp=.*?>(.*?)</quote>`)
+	urlRegexp           = regexp.MustCompile(`(https?://[^\s]+)`)
 )
 
 func convertToMetachat(resource resource) metachat.Message {
@@ -59,6 +60,7 @@ func convertToSkype(msg metachat.Message) message {
 
 	content = metachat.MentionRegexp.ReplaceAllString(content, `@${1}`)
 	content = metachat.QuoteRegexp.ReplaceAllString(content, "Quote from ${1}:\n${2}\n\n")
+	content = urlRegexp.ReplaceAllString(content, `<a href="${1}">${1}</a>`)
 
 	if msg.Author != "" {
 		content = fmt.Sprintf(`<b raw_pre="*" raw_post="*">[%s]</b> %s`, msg.Author, content)
