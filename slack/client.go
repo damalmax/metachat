@@ -29,7 +29,6 @@ type (
 		messageChan       chan metachat.Message
 	}
 
-	// TODO add read/write methods with lock encapsulation
 	userMap struct {
 		sync.RWMutex
 		users map[string]string
@@ -50,7 +49,7 @@ func NewClient(config Config) (*Client, error) {
 
 	usersByID := userMap{users: make(map[string]string)}
 	for _, user := range users {
-		usersByID.users[user.ID] = user.RealName
+		usersByID.put(user.ID, user.RealName)
 	}
 
 	return &Client{
@@ -144,4 +143,20 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 	// TODO handle user join
 
 	render.JSON(w, r, render.M{})
+}
+
+func (m *userMap) get(key string) (string, bool) {
+	m.RLock()
+	defer m.RUnlock()
+
+	val, ok := m.users[key]
+
+	return val, ok
+}
+
+func (m *userMap) put(key, value string) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.users[key] = value
 }

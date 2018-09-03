@@ -32,9 +32,7 @@ func convertToSlack(msg metachat.Message) string {
 }
 
 func (c *Client) convertToMetachat(event *slackevents.MessageEvent) (metachat.Message, error) {
-	c.usersByID.RLock()
-	author := c.usersByID.users[event.User]
-	c.usersByID.RUnlock()
+	author, _ := c.usersByID.get(event.User)
 
 	content := boldRegexp.ReplaceAllString(event.Text, metachat.Bold("${1}"))
 	content = italicRegexp.ReplaceAllString(content, metachat.Italic("${1}"))
@@ -42,9 +40,7 @@ func (c *Client) convertToMetachat(event *slackevents.MessageEvent) (metachat.Me
 	content = preformattedRegexp.ReplaceAllString(content, metachat.Preformatted("${1}"))
 	content = mentionRegexp.ReplaceAllStringFunc(content, func(match string) string {
 		id := mentionRegexp.FindStringSubmatch(match)[1]
-		c.usersByID.RLock()
-		name := c.usersByID.users[id]
-		c.usersByID.RUnlock()
+		name, _ := c.usersByID.get(id)
 
 		return "@" + name
 	})
