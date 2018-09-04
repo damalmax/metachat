@@ -18,7 +18,7 @@ var (
 	preformattedRegexp  = regexp.MustCompile(`(?s)<pre\b.*?>(.*?)</pre\b.*?>`)
 	linkRegexp          = regexp.MustCompile(`<a\b.*?href="(.*?)">.*?</a>`)
 	mentionRegexp       = regexp.MustCompile(`<at\b.*?id=".*?">(.*?)</at>`)
-	quoteRegexp         = regexp.MustCompile(`(?s)<quote\b.*?authorname="(.*?)" timestamp=.*?>(.*?)</quote>`)
+	quoteRegexp         = regexp.MustCompile(`(?s)<quote\b.*?authorname="(.*?)".*?>(.*?)</quote>`)
 	urlRegexp           = regexp.MustCompile(`(https?://[^\s]+)`)
 )
 
