@@ -86,7 +86,9 @@ func (c *Client) Webhook() http.Handler {
 // Send sends a message to chat with the provided ID.
 func (c *Client) Send(msg metachat.Message, chat string) error {
 	content := convertToSlack(msg)
-	_, _, err := c.api.PostMessage(chat, content, slack.PostMessageParameters{UnfurlLinks: true, Markdown: true})
+	_, _, err := c.api.PostMessage(chat, content, slack.PostMessageParameters{UnfurlLinks: true, UnfurlMedia: true,
+		Markdown: true})
+
 	if err != nil {
 		return errors.WithStack(err)
 	}
