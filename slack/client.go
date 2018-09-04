@@ -25,7 +25,7 @@ type (
 	Client struct {
 		verificationToken string
 		api               *slack.Client
-		usersByID         userMap
+		usersByID         *userMap
 		messageChan       chan metachat.Message
 	}
 
@@ -47,7 +47,7 @@ func NewClient(config Config) (*Client, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	usersByID := userMap{users: make(map[string]string)}
+	usersByID := &userMap{users: make(map[string]string)}
 	for _, user := range users {
 		usersByID.put(user.ID, user.RealName)
 	}
@@ -115,7 +115,7 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	if event.Type == slackevents.URLVerification {
 		var resp *slackevents.ChallengeResponse
-		err := json.Unmarshal([]byte(body), &resp)
+		err := json.Unmarshal(body, &resp)
 		if err != nil {
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, render.M{"error": err.Error()})
