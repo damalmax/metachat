@@ -14,6 +14,7 @@ var (
 	strikethroughRegexp = regexp.MustCompile(`~(.*?)~`)
 	preformattedRegexp  = regexp.MustCompile("(?s)```(.*?)```")
 	mentionRegexp       = regexp.MustCompile(`<@(.*?)>`)
+	urlRegexp           = regexp.MustCompile(`<(https?://.*?)>`)
 )
 
 func convertToSlack(msg metachat.Message) string {
@@ -38,6 +39,7 @@ func (c *Client) convertToMetachat(event *slackevents.MessageEvent) (metachat.Me
 	content = italicRegexp.ReplaceAllString(content, metachat.Italic("${1}"))
 	content = strikethroughRegexp.ReplaceAllString(content, metachat.Strikethrough("${1}"))
 	content = preformattedRegexp.ReplaceAllString(content, metachat.Preformatted("${1}"))
+	content = urlRegexp.ReplaceAllString(content, "${1}")
 	content = mentionRegexp.ReplaceAllStringFunc(content, func(match string) string {
 		id := mentionRegexp.FindStringSubmatch(match)[1]
 		name, _ := c.usersByID.get(id)
