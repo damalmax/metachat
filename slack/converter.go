@@ -3,6 +3,7 @@ package slack
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/nlopes/slack/slackevents"
 	"github.com/thehadalone/metachat/metachat"
@@ -47,6 +48,10 @@ func (c *Client) convertToMetachat(event *slackevents.MessageEvent, chat string,
 
 		return "@" + name
 	})
+
+	content = strings.Replace(content, "&lt;", "<", -1)
+	content = strings.Replace(content, "&gt;", ">", -1)
+	content = strings.Replace(content, "&amp;", "&", -1)
 
 	if edit {
 		content = metachat.Edit(content)
