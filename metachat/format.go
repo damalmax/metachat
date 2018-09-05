@@ -13,6 +13,7 @@ var (
 	PreformattedRegexp  = regexp.MustCompile("(?s)#{preformatted}(.*?){preformatted}#")
 	MentionRegexp       = regexp.MustCompile("#{mention}(.*?){mention}#")
 	QuoteRegexp         = regexp.MustCompile("#{quote author=(.*?)}(.*?){quote}#")
+	EditRegexp          = regexp.MustCompile("#{edit}(.*?){edit}#")
 )
 
 // Bold marks text as bold using Metachat tag.
@@ -43,4 +44,9 @@ func Mention(text string) string {
 // Quote marks text as quote using Metachat tag.
 func Quote(text, author string) string {
 	return fmt.Sprintf("#{quote author=%s}%s{quote}#", author, text)
+}
+
+// Edit marks text as edited using Metachat tag.
+func Edit(text string) string {
+	return fmt.Sprintf("#{edit}%s{edit}#", text)
 }

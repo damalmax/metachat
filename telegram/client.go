@@ -90,7 +90,8 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	msg := event.Message
-	if msg == nil {
+	edit := event.EditedMessage != nil
+	if edit {
 		msg = event.EditedMessage
 	}
 
@@ -98,6 +99,6 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c.messageChan <- convertToMetachat(msg)
+	c.messageChan <- convertToMetachat(msg, edit)
 	render.JSON(w, r, render.M{})
 }

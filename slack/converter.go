@@ -24,6 +24,7 @@ func convertToSlack(msg metachat.Message) string {
 	content = metachat.PreformattedRegexp.ReplaceAllString(content, "```${1}```")
 	content = metachat.MentionRegexp.ReplaceAllString(content, "@${1}")
 	content = metachat.QuoteRegexp.ReplaceAllString(content, "Quote from ${1}:\n${2}\n\n")
+	content = metachat.EditRegexp.ReplaceAllString(content, "Edit: ${1}")
 
 	if msg.Author != "" {
 		content = fmt.Sprintf("*[%s]* %s", msg.Author, content)
@@ -32,7 +33,7 @@ func convertToSlack(msg metachat.Message) string {
 	return content
 }
 
-func (c *Client) convertToMetachat(event *slackevents.MessageEvent) (metachat.Message, error) {
+func (c *Client) convertToMetachat(event *slackevents.MessageEvent, chat string, edit bool) (metachat.Message, error) {
 	author, _ := c.usersByID.get(event.User)
 
 	content := boldRegexp.ReplaceAllString(event.Text, metachat.Bold("${1}"))
@@ -47,9 +48,13 @@ func (c *Client) convertToMetachat(event *slackevents.MessageEvent) (metachat.Me
 		return "@" + name
 	})
 
+	if edit {
+		content = metachat.Edit(content)
+	}
+
 	return metachat.Message{
 		Messenger: "Slack",
-		Chat:      event.Channel,
+		Chat:      chat,
 		Author:    author,
 		Text:      content,
 	}, nil

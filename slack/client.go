@@ -128,11 +128,17 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	if event.Type == slackevents.CallbackEvent {
 		if messageEvent, ok := event.InnerEvent.Data.(*slackevents.MessageEvent); ok {
-			if messageEvent.Text == "" || messageEvent.User == "" {
+			if (messageEvent.Text == "" || messageEvent.User == "") && messageEvent.Message == nil {
 				return
 			}
 
-			message, err := c.convertToMetachat(messageEvent)
+			msg := messageEvent
+			edit := messageEvent.Message != nil
+			if edit {
+				msg = messageEvent.Message
+			}
+
+			message, err := c.convertToMetachat(msg, messageEvent.Channel, edit)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return

@@ -9,10 +9,14 @@ import (
 	"github.com/thehadalone/metachat/metachat"
 )
 
-func convertToMetachat(msg *tgbotapi.Message) metachat.Message {
+func convertToMetachat(msg *tgbotapi.Message, edit bool) metachat.Message {
 	content := formatText(msg)
 	if msg.ReplyToMessage != nil {
 		content = metachat.Quote(formatText(msg.ReplyToMessage), author(msg.ReplyToMessage)) + " " + content
+	}
+
+	if edit {
+		content = metachat.Edit(content)
 	}
 
 	return metachat.Message{
@@ -31,6 +35,7 @@ func convertToTelegram(message metachat.Message) tgbotapi.MessageConfig {
 	content = metachat.PreformattedRegexp.ReplaceAllString(content, "```${1}```")
 	content = metachat.MentionRegexp.ReplaceAllString(content, "@${1}")
 	content = metachat.QuoteRegexp.ReplaceAllString(content, "Quote from ${1}:\n${2}\n\n")
+	content = metachat.EditRegexp.ReplaceAllString(content, "Edit: ${1}")
 
 	if message.Author != "" {
 		content = fmt.Sprintf("*[%s]* %s", message.Author, content)

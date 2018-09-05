@@ -20,34 +20,40 @@ var (
 	mentionRegexp       = regexp.MustCompile(`<at\b.*?id=".*?">(.*?)</at>`)
 	quoteRegexp         = regexp.MustCompile(`(?s)<quote\b.*?authorname="(.*?)".*?>(.*?)</quote>`)
 	urlRegexp           = regexp.MustCompile(`(https?://[^\s]+)`)
+	editRegexp          = regexp.MustCompile(`</?e_m\b.*?>`)
 )
 
 func convertToMetachat(resource resource) metachat.Message {
 	chatGroups := chatRegexp.FindStringSubmatch(resource.ConversationLink)
+	content := resource.Content
 
-	message := metachat.Message{
+	edit := editRegexp.MatchString(content)
+
+	content = removeRegexp.ReplaceAllString(content, "")
+	content = legacyQuoteRegexp.ReplaceAllString(content, "")
+	content = boldRegexp.ReplaceAllString(content, metachat.Bold("${1}"))
+	content = italicRegexp.ReplaceAllString(content, metachat.Italic("${1}"))
+	content = strikethroughRegexp.ReplaceAllString(content, metachat.Strikethrough("${1}"))
+	content = preformattedRegexp.ReplaceAllString(content, metachat.Preformatted("${1}"))
+	content = linkRegexp.ReplaceAllString(content, "${1}")
+	content = mentionRegexp.ReplaceAllString(content, metachat.Mention("${1}"))
+	content = quoteRegexp.ReplaceAllString(content, metachat.Quote("${2}", "${1}"))
+	content = strings.Replace(content, "&lt;", "<", -1)
+	content = strings.Replace(content, "&gt;", ">", -1)
+	content = strings.Replace(content, "&amp;", "&", -1)
+	content = strings.Replace(content, "&quot;", "\"", -1)
+	content = strings.Replace(content, "&apos;", "'", -1)
+
+	if edit {
+		content = metachat.Edit(content)
+	}
+
+	return metachat.Message{
 		Messenger: "Skype",
 		Chat:      chatGroups[1],
 		Author:    resource.Imdisplayname,
-		Text:      resource.Content,
+		Text:      content,
 	}
-
-	message.Text = removeRegexp.ReplaceAllString(message.Text, "")
-	message.Text = legacyQuoteRegexp.ReplaceAllString(message.Text, "")
-	message.Text = boldRegexp.ReplaceAllString(message.Text, metachat.Bold("${1}"))
-	message.Text = italicRegexp.ReplaceAllString(message.Text, metachat.Italic("${1}"))
-	message.Text = strikethroughRegexp.ReplaceAllString(message.Text, metachat.Strikethrough("${1}"))
-	message.Text = preformattedRegexp.ReplaceAllString(message.Text, metachat.Preformatted("${1}"))
-	message.Text = linkRegexp.ReplaceAllString(message.Text, "${1}")
-	message.Text = mentionRegexp.ReplaceAllString(message.Text, metachat.Mention("${1}"))
-	message.Text = quoteRegexp.ReplaceAllString(message.Text, metachat.Quote("${2}", "${1}"))
-	message.Text = strings.Replace(message.Text, "&lt;", "<", -1)
-	message.Text = strings.Replace(message.Text, "&gt;", ">", -1)
-	message.Text = strings.Replace(message.Text, "&amp;", "&", -1)
-	message.Text = strings.Replace(message.Text, "&quot;", "\"", -1)
-	message.Text = strings.Replace(message.Text, "&apos;", "'", -1)
-
-	return message
 }
 
 func convertToSkype(msg metachat.Message) message {
@@ -61,6 +67,7 @@ func convertToSkype(msg metachat.Message) message {
 	content = metachat.MentionRegexp.ReplaceAllString(content, `@${1}`)
 	content = metachat.QuoteRegexp.ReplaceAllString(content, "Quote from ${1}:\n${2}\n\n")
 	content = urlRegexp.ReplaceAllString(content, `<a href="${1}">${1}</a>`)
+	content = metachat.EditRegexp.ReplaceAllString(content, `Edit: ${1}`)
 
 	if msg.Author != "" {
 		content = fmt.Sprintf(`<b raw_pre="*" raw_post="*">[%s]</b> %s`, msg.Author, content)
