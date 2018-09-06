@@ -128,7 +128,9 @@ func (c *Client) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	if event.Type == slackevents.CallbackEvent {
 		if messageEvent, ok := event.InnerEvent.Data.(*slackevents.MessageEvent); ok {
-			if (messageEvent.Text == "" || messageEvent.User == "") && messageEvent.Message == nil {
+			if (messageEvent.Text == "" || messageEvent.User == "") &&
+				(messageEvent.Message.Text == "" || messageEvent.Message.User == "") {
+
 				return
 			}
 
