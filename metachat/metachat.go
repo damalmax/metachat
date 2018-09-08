@@ -139,7 +139,7 @@ func (m *Metachat) validate() error {
 func (m *Metachat) registerHandlers(errChan chan error) {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Heartbeat("/health"))
+	r.Use(middleware.Heartbeat("/"))
 	r.Post("/rooms/{room}", m.postMessageHandler)
 
 	for _, msgr := range m.messengers {
